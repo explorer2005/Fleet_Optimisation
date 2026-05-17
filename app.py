@@ -18,12 +18,14 @@ r2 = st.sidebar.slider("Secondary Response Time (r2) min", min_value=10.0, max_v
 alpha = st.sidebar.slider("Fleet Reliability (Alpha)", min_value=0.1, max_value=1.0, value=0.95, step=0.05)
 n_clusters = st.sidebar.slider("Number of Demand Clusters", min_value=5, max_value=50, value=20, step=1)
 
+import sys
+
 def run_pipeline(full=True):
     progress_bar = st.sidebar.progress(0)
     status_text = st.sidebar.empty()
     details_text = st.sidebar.empty()
     
-    python_exec = "python"
+    python_exec = sys.executable
     
     def run_cmd(cmd, step_name, base_progress, progress_chunk):
         status_text.text(f"Running {step_name}...")
@@ -115,14 +117,20 @@ def load_data():
         demands = pd.read_csv(r"data\processed\Demand_Points.csv")
         
     if os.path.exists(r"data\processed\optimized_deployment.csv"):
-        deployments = pd.read_csv(r"data\processed\optimized_deployment.csv")
-        
+        try:
+            deployments = pd.read_csv(r"data\processed\optimized_deployment.csv")
+        except pd.errors.EmptyDataError:
+            deployments = pd.DataFrame()
+            
     return ambulances, demands, deployments
 
 ambulances, demands, deployments = load_data()
 
 # Render Map
 if not ambulances.empty and not demands.empty:
+    if deployments.empty:
+        st.warning("⚠️ **No active deployment plan found!** This usually means your time constraints (r1 / r2) are mathematically impossible to satisfy with the current Alpha fleet limit. Try relaxing the sliders (e.g., higher response times or higher Alpha) and click 'Run Fast Optimization Only' again.")
+        
     st.subheader("Interactive Deployment Map")
     
     # Calculate center of map
@@ -155,7 +163,7 @@ if not ambulances.empty and not demands.empty:
         lon_col = 'Ambulance_Lon' if 'Ambulance_Lon' in row else 'Longitude'
         
         amb_id = row['Ambulance_ID']
-        is_deployed = amb_id in deployed_ambs or deployments.empty
+        is_deployed = amb_id in deployed_ambs # Only mark green if actually in the active set
         
         color = "green" if is_deployed else "lightgray"
         icon_type = "plus" if is_deployed else "minus"
@@ -195,7 +203,7 @@ if not ambulances.empty and not demands.empty:
     # Metrics
     col1, col2, col3 = st.columns(3)
     
-    deployed_count = len(deployed_ambs) if not deployments.empty else len(ambulances)
+    deployed_count = len(deployed_ambs) if not deployments.empty else 0
     col1.metric("Active Ambulances", f"{deployed_count} / {len(ambulances)}")
     col2.metric("Total Demand Clusters", len(demands))
     
