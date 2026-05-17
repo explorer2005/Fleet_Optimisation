@@ -1,0 +1,10 @@
+pandas
+numpy
+pulp
+requests
+scikit-learn
+openpyxl
+streamlit
+folium
+streamlit-folium
+plotly
